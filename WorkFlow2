@@ -1,0 +1,112 @@
+- ⁠background subtraction (remove artefacts): check if this makes any sense? --> try without this first
+  fit a 2d surface to get an approximation of the surface, as affected by light gradients (least squares fit). Little specks/anomalies don’t affect overall fit.
+- large Gaussian Blur filter to remove pores (and noise) by blurring them - save
+- Subtract this image from main to get only pores
+- pores are always darker (-ve)
+- filter small noise (Weiner filter? Median? Gaussian?)
+- enhance the contrast (tanh?)
+- binarize the image -> mask
+- close shapes? fill holes? remove speckles (closing and filling didn’t help these) - false detection?
+
+
+---------------------------------------------------------------------------------------------------------------------------------------------
+Notes on Background Subtraction:
+------------------------------------
+Summary:
+
+2D surface fitting won’t remove ring artefacts effectively.
+It targets smooth, low-frequency illumination or background gradients, while ring artefacts are structured, narrow, detector-fixed artefacts that behave very differently.
+If you only have the reconstructed volume, you can apply polar coordinate filtering: convert the image to polar coordinates (centered on the rotation axis), apply a radial high-pass filter to suppress slowly varying intensity along the angular dimension (the rings), and transform back. This works, but it can also distort fine circular structures — best as a last resort.
+
+--------------------------
+Polar + median (recommended first try)
+- Convert slice → polar image (radius × angle).
+- For each radius, median-filter (or lowpass) along the angle axis to estimate the ring baseline, then subtract or divide to remove rings.
+- Inverse polar → cleaned slice.
+
+Polar + angular high-pass (FFT)
+- Same polar transform, then remove low angular frequencies (i.e., high-pass along the angle axis) using an FFT filter to suppress slowly varying ring components.
+
+--------------------------
+
+
+Projection corrections preserve linearity for reconstruction. In tomographic reconstructions, each 2D slice represents a true spatial cross-section, not an illumination field — so large-scale gradients are less common (but ring artefacts or beam hardening may appear instead).
+In projection images (raw sinograms before reconstruction), illumination gradients are very common, and this approach is especially valuable there. Also, this works best for additive artefacts (illumination, background glow). For multiplicative effects (vignetting, gain variation), you’d want to divide by the fitted background instead of subtracting it.
+If you fit using robust regression (e.g. RANSAC, Huber loss, or median-based fitting) or mask out obvious sample regions, small artefacts or particles won’t bias the overall fit. That’s key — least-squares alone can be sensitive to outliers.
+Bad detector pixels: detect persistent bad columns across flats and correct them prior to fitting (interpolate or replace using neighbors). This reduces ring artifacts downstream.
+
+Ring artefacts in reconstructed slices come from:
+- Fixed-pattern detector defects — e.g. bad or miscalibrated pixels/columns.
+- Incorrect or unstable flat-field correction (flats changing over time).
+- Time-varying gain or beam fluctuations during the scan.
+Those manifest in Projection space (raw data) as vertical stripes (along the rotation axis). After reconstruction, these vertical stripes become concentric rings in slices.
+
+What does remove ring artefacts
+
+1. Stripe correction in sinogram (before reconstruction) - This is the gold standard.
+Work in sinogram space (after taking the logarithm):
+Typical pipeline:
+- Compute the sinogram (each detector column over all angles).
+- Detect and suppress vertical stripes:
+  > Median filtering along the rotation angle direction.
+  > Wavelet–Fourier filtering.
+  > Adaptive column normalization.
+- Libraries/tools:
+  > tomopy.prep.stripe.remove_stripe_ti
+  > scikit-image.restoration.denoise_wavelet (for custom wavelet stripe removal)
+  > Synchrotron beamlines often have custom scripts for this.
+Key idea: The correction must act column-wise (per detector pixel track) rather than across the 2D surface.
+
+2. Improved flat/dark-field correction
+Sometimes the root cause is drifting illumination or fluctuating flats.
+- Acquire dynamic flats (before and after each scan segment).
+- Use interpolated or PCA-based flat correction (“eigenflat” method).
+- Re-normalize each projection column by the average intensity of its neighbors.
+\This fixes the problem at the source.
+
+3. Post-reconstruction ring suppression (fallback)
+If you only have the reconstructed volume, you can apply polar coordinate filtering: convert the image to polar coordinates (centered on the rotation axis), apply a radial high-pass filter to suppress slowly varying intensity along the angular dimension (the rings), and transform back. This works, but it can also distort fine circular structures — best as a last resort.
+
+
+Standard pipeline for X-ray tomography projections:
+----------------------------------------------------
+Acquire / load images
+proj = raw projection image, flat = averaged flat-field (I₀) image, dark = averaged dark-field (offset) image.
+
+Dark / flat normalization (must do this first)
+Correct each projection with the standard formula:
+norm = (proj - dark) / (flat - dark)
+Rationale: this removes detector offset and global gain pattern so the data obey (approximately) Beer–Lambert. 
+
+Log transform (linearize Beer–Lambert)
+line = -np.log(norm)
+Now line ≈ line integral of attenuation (additive), which is the proper input for reconstruction. 
+
+Background / illumination correction (your 2D surface fit) — apply on the normalized projections or the log-domain depending on cause:
+If the issue is multiplicative (uneven illumination / detector gain) → work on the normalized image and divide by a fitted smooth field (or fit to flats).
+If you’re dealing with additive offsets (residual background/diffuse offset) → subtract the fitted surface from the log image.
+Practical rule: Do flat/dark first, log next, then fit and subtract a smooth 2-D surface from line if the artefact behaves like an additive low-frequency bias. For multiplicative patterns persistent after normalization, fit a surface to the norm and divide before taking -log. 
+
+How to fit the surface robustly (to ignore specks/anomalies)
+Mask the sample / high-signal regions if possible: threshold the normalized projection to find free-space detector pixels and fit only to those.
+Use robust regression: RANSAC, Huber loss, or median-based smoothing. This prevents small bright/dark specks (bad pixels, dust) from biasing the fit.
+Use low order polynomials (2nd–3rd) or smooth splines / rolling-ball / Gaussian with a very large radius — keep the spatial frequency of the fit lower than the largest object features. 
+
+Then reconstruct from the corrected sinogram / projections.
+Many problems (ring artifacts, strong beam hardening) are best handled partly in projection space and partly after reconstruction (sinogram filtering, iterative correction). 
+
+Postprocessing to reduce ring artifacts
+If bad detector columns remain, remove stripes in the sinogram domain (stripe detection + median/filtered replacement) before reconstruction — this is the standard way to avoid rings in CT slices. 
+
+Beam-hardening & scatter — separate problems
+Beam hardening (polychromatic spectra) causes cupping/streaks and is not fixed by simple surface subtraction. Use polynomial beam-hardening correction or physics/iterative approaches if you see cupping/streaking.
+
+When this won’t solve the problem
+- Beam-hardening cupping / strong polychromatic effects — need polynomial beam-hardening correction or iterative physics-based correction.
+- Scatter (large objects): scattering introduces low-frequency bias that may not be cleanly removed by simple 2D fitting. Dedicated scatter correction is preferable. 
+- Highly non-stationary flats (flats changing shot-to-shot): consider eigen-flat (PCA) or dynamic flat estimation. 
+Short checklist to decide how to apply your 2D fit
+- Do you have flats & darks? → Yes: normalize first, then log, then fit/subtract in log domain.
+- Is the pattern multiplicative after flats? → Fit on the normalized image and divide by fitted field, then log.
+- Are there small specks / bad pixels? → Use RANSAC/Huber or mask background pixels to prevent bias.
+- Do you see cupping/streaks? → Add beam-hardening correction or iterative methods.
