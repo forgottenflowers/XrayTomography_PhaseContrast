@@ -4,9 +4,13 @@ import time
 import logging
 from ij import IJ
 
-# Folder containing .vol.info files
-vol_info_dir = "G:/trial_data/vol_info"
+# Define folders
+vol_info_dir = "//fulnas2/c03-basic-res-shared$/tomo/Shreya/Soleil_Corals/Soleil_Recon/do_now/vol_info_files"
+#vol_info_dir = "R:/Project_Folders/2505_Coral_ANATOMIX_recs/vol_info_files"
+#we are using this folder as an index, because of the way data is organized here
 vol_data_dir = os.path.dirname(vol_info_dir)
+out_path = "//fulnas2/c03-basic-res-shared$/tomo/Shreya/Soleil_Corals/Soleil_Recon/do_now/"
+log_path = "C:/Users/shra13/Desktop/shreya_log_file.txt"
 
 # Image properties common to all vol files (predefining makes code faster)
 z = 2048                            # int(params["NUM_Z"])
@@ -14,10 +18,10 @@ endian = "little-endian"            #"little-endian" if params["BYTEORDER"].uppe
 image_type = "[16-bit Unsigned]"    #default  
 
 # Save log
-logging.basicConfig(filename="C:/Users/shra13/Desktop/shreya_log_file.txt", level=logging.INFO, format="%(asctime)s - %(message)s")
+logging.basicConfig(filename=log_path, level=logging.INFO, format="%(asctime)s - %(message)s")
 
-# Get all .vol.info files
-vol_info_files = glob.glob(os.path.join(vol_info_dir, "*.vol.info"))
+# Get all .vol.info files (that end in _0)
+vol_info_files = glob.glob(os.path.join(vol_info_dir, "*_0.vol.info"))
 
 # Loop over each .vol.info file
 for vol_info_path in vol_info_files:
@@ -36,7 +40,8 @@ for vol_info_path in vol_info_files:
         continue
     
     # Path to output file
-    out_path = vol_data_dir + "/" + datafoldername + "/" + datafoldername + "_0_16b.tif"
+    # out_path = vol_data_dir + "/" + datafoldername + "/" + datafoldername + "_0_16b.tif"
+    out_path = "T:/tomo/Shreya/2505_soleil_recon" + "/" + datafoldername + "_0_16b.tif"
  
     # Read parameters from info file
     params = {}
