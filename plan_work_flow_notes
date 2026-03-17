@@ -110,3 +110,100 @@ Short checklist to decide how to apply your 2D fit
 - Is the pattern multiplicative after flats? → Fit on the normalized image and divide by fitted field, then log.
 - Are there small specks / bad pixels? → Use RANSAC/Huber or mask background pixels to prevent bias.
 - Do you see cupping/streaks? → Add beam-hardening correction or iterative methods.
+
+
+
+
+
+Here’s a common pipeline:
+
+---
+
+## 🔹 1. **Data Acquisition**
+
+* You already did this: phase-contrast tomography at Soleil → raw projection images (`.edf`, `.tif`, `.hdf5`, etc.).
+* Metadata often encodes voxel size, exposure, filters, sample-detector distance.
+
+---
+
+## 🔹 2. **Reconstruction**
+
+* **Goal:** Turn 2D projections → 3D volume.
+* At Soleil, reconstruction is typically done with:
+
+  * **PyHST2** or **PyHST-Tomography** (standard ESRF/SOLEIL pipeline).
+  * Sometimes **Paganin phase retrieval** applied during reconstruction for phase-contrast.
+* Output: a 3D stack (often **16-bit TIFF** or **HDF5**).
+
+---
+
+## 🔹 3. **Pre-Processing**
+
+* Import reconstructed volume into **Fiji/ImageJ**, **Avizo/Amira**, or **Dragonfly**.
+* Apply corrections:
+
+  * Ring artifact removal.
+  * Beam-hardening correction (if needed).
+  * Cropping & rescaling.
+  * Denoising (non-local means, median, Gaussian, or wavelet filters).
+
+---
+
+## 🔹 4. **Segmentation**
+
+* **Goal:** Separate bone tissue from background/pores/marrow.
+* Common methods:
+
+  * Global or adaptive thresholding (Otsu, Yen, or user-defined).
+  * Phase-contrast often yields very clear edges → watershed + threshold can work well.
+  * Machine learning (e.g. **Trainable Weka in Fiji**, **ilastik**, or **Dragonfly deep learning tools**) if gray levels overlap.
+
+---
+
+## 🔹 5. **Post-Segmentation Processing**
+
+* Clean the binary mask:
+
+  * Morphological opening/closing.
+  * Hole filling.
+  * Remove small objects/noise.
+* Sometimes register/align datasets (if multiple scans or regions of interest).
+
+---
+
+## 🔹 6. **Quantitative Analysis**
+
+Typical metrics for **bone phase-contrast tomography**:
+
+* **Morphometry:**
+
+  * Bone volume fraction (BV/TV).
+  * Trabecular thickness, spacing, number (Tb.Th, Tb.Sp, Tb.N).
+  * Cortical thickness.
+* **Porosity:** pore volume, distribution, connectivity.
+* **3D structure:** anisotropy, orientation tensors, fractal dimension.
+* **Surface properties:** surface-to-volume ratio.
+
+Software:
+
+* **BoneJ (Fiji plugin)** → trabecular/cortical analysis.
+* **Amira/Avizo** → more advanced morphometry + visualization.
+* **Dragonfly, MorphoLibJ, Scikit-image** → open-source options.
+
+---
+
+## 🔹 7. **Visualization**
+
+* 3D renderings (isosurfaces, volume rendering) in Amira/Avizo or Paraview.
+* Color-coded maps of thickness, density, or strain.
+* Export 3D models for simulation (e.g. finite element analysis).
+
+---
+
+## 🔹 8. **Archival & Reproducibility**
+
+* Keep both **raw projections** and **reconstructed volumes** (with metadata).
+* Store voxel size and imaging parameters alongside results → crucial for quantitative bone metrics.
+
+---
+
