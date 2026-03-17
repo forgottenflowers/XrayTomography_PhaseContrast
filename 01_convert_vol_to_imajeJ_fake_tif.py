@@ -9,7 +9,7 @@ vol_info_dir = "//fulnas2/c03-basic-res-shared$/tomo/Shreya/Soleil_Corals/Soleil
 #vol_info_dir = "R:/Project_Folders/2505_Coral_ANATOMIX_recs/vol_info_files"
 #we are using this folder as an index, because of the way data is organized here
 vol_data_dir = os.path.dirname(vol_info_dir)
-out_path = "//fulnas2/c03-basic-res-shared$/tomo/Shreya/Soleil_Corals/Soleil_Recon/do_now/"
+out_dir = "//fulnas2/c03-basic-res-shared$/tomo/Shreya/Soleil_Corals/Soleil_Recon/do_now"
 log_path = "C:/Users/shra13/Desktop/shreya_log_file.txt"
 
 # Image properties common to all vol files (predefining makes code faster)
@@ -41,7 +41,7 @@ for vol_info_path in vol_info_files:
     
     # Path to output file
     # out_path = vol_data_dir + "/" + datafoldername + "/" + datafoldername + "_0_16b.tif"
-    out_path = "T:/tomo/Shreya/2505_soleil_recon" + "/" + datafoldername + "_0_16b.tif"
+    out_path = out_dir + "/" + datafoldername + "_0_16b.tif"
  
     # Read parameters from info file
     params = {}
